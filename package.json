@@ -1,0 +1,14 @@
+{
+  "name": "meta-social-publisher-automation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tests for the pure queue and safety logic used by the Apps Script publisher.",
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "check": "npm test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

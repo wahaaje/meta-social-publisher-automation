@@ -1,0 +1,111 @@
+<!doctype html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <style>
+      :root { color-scheme: light; --ink:#13231f; --muted:#5f6f69; --line:#dbe5e1; --brand:#0f6b5b; --soft:#f3f8f6; --danger:#9b2c2c; }
+      * { box-sizing: border-box; }
+      body { margin:0; padding:24px; font:14px/1.45 Arial,sans-serif; color:var(--ink); background:#fff; }
+      h1 { margin:0 0 6px; font-size:22px; }
+      .lede { margin:0 0 20px; color:var(--muted); }
+      .summary { display:none; margin:0 0 18px; padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--soft); }
+      .summary strong { display:block; margin-bottom:4px; }
+      label { display:block; margin:14px 0 6px; font-weight:700; }
+      input { width:100%; border:1px solid #b7c6c0; border-radius:8px; padding:10px 11px; font:inherit; color:var(--ink); }
+      input:focus { outline:3px solid #c8eee6; border-color:var(--brand); }
+      .hint { margin:5px 0 0; color:var(--muted); font-size:12px; }
+      .actions { display:flex; gap:10px; align-items:center; margin-top:22px; }
+      button { border:0; border-radius:8px; padding:10px 16px; font-weight:700; cursor:pointer; }
+      #save { color:#fff; background:var(--brand); }
+      #close { color:var(--ink); background:#edf2f0; }
+      button:disabled { opacity:.55; cursor:wait; }
+      #status { min-height:40px; margin-top:16px; padding:11px 12px; border-radius:8px; background:#f6f8fa; color:var(--muted); white-space:pre-wrap; }
+      #status.error { color:var(--danger); background:#fff2f2; }
+      #status.ok { color:#145c3a; background:#edf9f1; }
+      .security { margin-top:16px; padding-top:13px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; }
+    </style>
+  </head>
+  <body>
+    <h1>Connect your publishing accounts</h1>
+    <p class="lede">The connection is verified now. Publishing remains off until you explicitly enable it from the spreadsheet menu.</p>
+
+    <div id="summary" class="summary"><strong>Current connection</strong><span id="summaryText"></span></div>
+
+    <form id="form">
+      <label for="folder">Google Drive campaign folder</label>
+      <input id="folder" name="folder" required placeholder="Drive folder link or folder ID" autocomplete="off">
+      <p class="hint">Queue media paths are resolved relative to this folder.</p>
+
+      <label for="page">Exact Facebook Page name</label>
+      <input id="page" name="expected_page_name" required placeholder="Example Business Page" autocomplete="off">
+      <p class="hint">The setup stops if the token belongs to another Page.</p>
+
+      <label for="token">Meta Page access token</label>
+      <input id="token" name="token" type="password" placeholder="Leave blank to keep the saved token" autocomplete="new-password">
+      <p class="hint">Use a Page token, not a user token. The saved token is never displayed here.</p>
+
+      <label for="zone">Publishing timezone</label>
+      <input id="zone" name="time_zone" required value="Asia/Karachi" placeholder="Asia/Karachi" autocomplete="off">
+
+      <div class="actions">
+        <button id="save" type="submit">Verify and save</button>
+        <button id="close" type="button">Close</button>
+      </div>
+    </form>
+    <div id="status" role="status">Loading saved connection…</div>
+    <p class="security">Only trusted administrators should be spreadsheet and Apps Script editors. An editor can change code that runs as the trigger owner.</p>
+
+    <script>
+      const form = document.getElementById('form');
+      const save = document.getElementById('save');
+      const statusBox = document.getElementById('status');
+      const summary = document.getElementById('summary');
+      const summaryText = document.getElementById('summaryText');
+
+      function status(message, kind) {
+        statusBox.textContent = message;
+        statusBox.className = kind || '';
+      }
+
+      function showSummary(data) {
+        if (!data || !data.configured) {
+          status('No connection is saved yet. Complete the fields above.', '');
+          return;
+        }
+        summaryText.textContent = data.page + ' · @' + data.instagram + ' · ' + data.folder + ' · ' + data.time_zone;
+        summary.style.display = 'block';
+        document.getElementById('page').value = data.page || '';
+        document.getElementById('zone').value = data.time_zone || 'Asia/Karachi';
+        status('A connection is saved. Enter a token only when replacing it.', '');
+      }
+
+      google.script.run.withSuccessHandler(showSummary).withFailureHandler(function () {
+        status('Could not read the saved setup. Close this dialog and try again.', 'error');
+      }).getSetupSummary();
+
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        save.disabled = true;
+        status('Verifying Drive access, Page identity, and linked Instagram account…', '');
+        const data = {
+          folder: document.getElementById('folder').value,
+          expected_page_name: document.getElementById('page').value,
+          token: document.getElementById('token').value,
+          time_zone: document.getElementById('zone').value
+        };
+        google.script.run.withSuccessHandler(function (result) {
+          document.getElementById('token').value = '';
+          save.disabled = false;
+          status(result.message + '\n\nFacebook: ' + result.page + '\nInstagram: @' + result.instagram + '\nDrive: ' + result.folder + '\nTimezone: ' + result.time_zone, 'ok');
+          showSummary({ configured:true, page:result.page, instagram:result.instagram, folder:result.folder, time_zone:result.time_zone });
+        }).withFailureHandler(function (error) {
+          save.disabled = false;
+          status(error && error.message ? error.message : 'Setup failed. Review the fields and try again.', 'error');
+        }).saveSetup(data);
+      });
+
+      document.getElementById('close').addEventListener('click', function () { google.script.host.close(); });
+    </script>
+  </body>
+</html>
